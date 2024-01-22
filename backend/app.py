@@ -55,19 +55,29 @@ def get_org_inbound_history():
             cursor.execute(query, (org_id,))
             request_list = cursor.fetchall()
             for _request in request_list:
-                # check if there exists alert info
                 result = _request['result']
                 if result:
-                    analysis_result = json.loads(result)
-                    _request['alert'] = has_issues(analysis_result)
-                    if _request['alert']:
-                        response_body = json.loads(_request['response_body'])
-                        data_result = format_result(result, response_body)
-                        json_data = json.dumps(data_result)
-                        _request['parsed_result'] = json_data
+                    # 检查 response_body 是否为 None
+                    if _request['response_body'] is not None:
+                        try:
+                            response_body = json.loads(_request['response_body'])
+                        except json.JSONDecodeError:
+                            # 如果 response_body 不能被解析为 JSON, 处理错误
+                            print("Error: Unable to parse 'response_body' as JSON.")
+                            response_body = {}  # 使用空字典，以便 format_result 函数可以处理
+                    else:
+                        # 如果 response_body 为 None, 使用空字典
+                        response_body = {}
+
+                    # 对 result 进行格式化并检查 alert
+                    data_result, alert = format_result(result, response_body)
+                    _request['alert'] = alert
+                    json_data = json.dumps(data_result)
+                    _request['parsed_result'] = json_data
                 else:
-                    _request['alert'] = False
-                
+                    _request['alert'] = 0
+                    _request['parsed_result'] = {}
+            print(jsonify(request_list))
             return jsonify(request_list)
         
     finally:
@@ -94,13 +104,28 @@ def get_request_detail():
             cursor.execute(query, (request_id,))
             request_list = cursor.fetchall()
             for _request in request_list:
-                # check if there exists alert info
                 result = _request['result']
                 if result:
-                    response_body = json.loads(_request['response_body'])
-                    data_result = format_result(result, response_body)
+                    # 检查 response_body 是否为 None
+                    if _request['response_body'] is not None:
+                        try:
+                            response_body = json.loads(_request['response_body'])
+                        except json.JSONDecodeError:
+                            # 如果 response_body 不能被解析为 JSON, 处理错误
+                            print("Error: Unable to parse 'response_body' as JSON.")
+                            response_body = {}  # 使用空字典，以便 format_result 函数可以处理
+                    else:
+                        # 如果 response_body 为 None, 使用空字典
+                        response_body = {}
+
+                    # 对 result 进行格式化并检查 alert
+                    data_result, alert = format_result(result, response_body)
+                    _request['alert'] = alert
                     json_data = json.dumps(data_result)
                     _request['parsed_result'] = json_data
+                else:
+                    _request['alert'] = 0
+                    _request['parsed_result'] = {}
 
             return jsonify(request_list)
     finally:
@@ -109,53 +134,47 @@ def get_request_detail():
 
 
 
-def has_issues(analysis_result):
-    data = analysis_result['data']
-    for part in ['reqHeaders', 'reqParams', 'reqBody']:
-        if part in data and data[part]['errorNum'] > 0:
-            return True
-    return False
-
-
 
 def format_result(result, response_body):
     res = {}
     result = json.loads(result)
     resultData = result.get('data', {})
+    alert = 0  # 默认没有警告
 
-    # traverse reqHeaders, reqParams, reqBody
     for part in ['reqHeaders', 'reqParams', 'reqBody']:
         section = resultData.get(part, {})  
         res[part] = []
 
-        for item in section.get('result', []): 
+        for item in section.get('result', []):
             fieldName = item.get('key', '')
             fieldValue = item.get('value', '')
+            important_field = item.get('isImportant', False)
             reasons = []
 
-            for r in item.get('results', []):  
+            for r in item.get('results', []):
                 if r.get('level') == "error":
                     reasons.append(r.get('desc', ''))
+                    # 更新 alert 状态
+                    if important_field and alert != 1:
+                        alert = 1
+                    elif not important_field and alert == 0:
+                        alert = -1
 
-            reason = "; ".join(reasons)  
+            reason = "; ".join(reasons)
             match = not bool(reasons)
             response_val = json_parse(response_body, fieldName)
-
 
             tmp = {
                 'fieldName': fieldName,
                 'request_value': fieldValue,
                 'response_value': response_val,
+                'important': important_field,
                 'match': match,
                 'reason': reason
             }
             res[part].append(tmp)
 
-    return res
-
-
-            
-
+    return res, alert
 
 
 if __name__ == '__main__':

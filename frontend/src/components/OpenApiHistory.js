@@ -4,30 +4,54 @@ import { useNavigate, useParams } from 'react-router-dom';
 function OpenApiHistory() {
   const { orgId } = useParams();
   const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // fetch data from backend server
     fetchData(orgId).then(data => {
-      // convert and merge columns
-      const transformedData = data.map(item => ({
-        ...item,
-        org: `${item.organization_id} - ${item.organization_name}`, // merge org_id and org_name
-      }));
-      setData(transformedData);
+      if (data.length === 0) {
+        // 如果数据为空，设置默认值
+        setData([{ reqHeaders: [], reqParams: [], reqBody: [] }]);
+      } else {
+        const transformedData = data.map(item => ({
+          ...item,
+          org: `${item.organization_id} - ${item.organization_name}`,
+        }));
+        setData(transformedData);
+      }
+      setLoading(false);
+    }).catch(error => {
+      setError(error.message);
+      setLoading(false);
     });
   }, [orgId]);
 
   const handleRowClick = (item) => {
-    console.log(item);
-    navigate(`/inbound/history/detail/${item.id}`, {state: {detail: item}});
+    navigate(`/inbound/history/detail/${item.id}`, { state: { detail: item } });
   }
 
-  if (data.length === 0) {
+  const renderAlertSymbol = (alertValue) => {
+    switch(alertValue) {
+      case 1:
+        return <span style={{ color: 'red' }}>&#9888;</span>;  
+      case -1:
+        return <span style={{ color: '#FFD700' }}>&#9888;</span>;  
+      case 0:
+        return <span style={{ color: 'green' }}>&#10004;</span>;
+      default:
+        return <span>N/A</span>
+    }
+  };
+
+  if (loading) {
     return <div>Loading...</div>;
   }
 
-  // customize columnNames
+  if (error) {
+    return <p>Error: {error}</p>;
+  }
+
   const columnNames = {
     "id": "ID",
     "org": "Org",
@@ -36,7 +60,6 @@ function OpenApiHistory() {
     "created_time": "Created Time"
   };
 
-  // define column name
   let columns = ['id', 'org', 'request_status', 'response_object_id', 'created_time'];
 
   return (
@@ -46,14 +69,14 @@ function OpenApiHistory() {
         <thead>
           <tr>
             {columns.map(column => <th key={column}>{columnNames[column]}</th>)}
-            <th>Alert</th> {/* Alert 列标题 */}
+            <th>Alert</th>
           </tr>
         </thead>
         <tbody>
           {data.map((item, index) => (
             <tr key={index} className="table-row-clickable" onClick={() => handleRowClick(item)}>
-              {columns.map(column => <td key={column}>{item[column]}</td>)}
-              <td>{item.alert ? '⚠️' : '✅'}</td> {/* 显示不同符号 */}
+              {columns.map(column => <td key={column}>{item[column] || 'N/A'}</td>)}
+              <td>{renderAlertSymbol(item.alert)}</td>
             </tr>
           ))}
         </tbody>

@@ -42,3 +42,11 @@
   cursor: pointer; /* 鼠标悬停时的手型指针 */
   background-color: #f5f5f5; /* 鼠标悬停时的背景色 */
 }
+
+
+.table-cell {
+  max-width: 200px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  white-space: normal;
+}

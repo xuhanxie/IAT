@@ -8,7 +8,6 @@ function RequestAnalysis() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 使用 useCallback 包裹 fetchData 函数
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -28,10 +27,9 @@ function RequestAnalysis() {
       setError(fetchError.message);
     }
     setLoading(false);
-  }, [requestId]); // 添加 requestId 作为依赖
+  }, [requestId]);
 
   useEffect(() => {
-    // 检查location.state是否已经有数据
     if (location.state?.detail) {
       try {
         const parsedData = JSON.parse(location.state.detail.parsed_result);
@@ -49,6 +47,15 @@ function RequestAnalysis() {
     }
   }, [fetchData, location.state]);
 
+  const renderMatchSymbol = (item) => {
+    // 检查 important 是否为 true
+    if (item.important === true) {
+      return <span style={{ color: 'red' }}>&#9888;</span>; // 红色警告
+    }
+    // 保持原有逻辑，对于 important 为 false 或 null 的情况
+    return item.match ? <span style={{ color: 'green' }}>&#10004;</span> : <span style={{ color: '#FFD700' }}>&#9888;</span>;
+  };
+
   const renderSection = (title, sectionData) => {
     if (!sectionData || !Array.isArray(sectionData)) {
       return <p>Data is not available or in an unexpected format for {title}.</p>;
@@ -63,6 +70,7 @@ function RequestAnalysis() {
               <th>Field Name</th>
               <th>Request Value</th>
               <th>Response Value</th>
+              <th>Important</th>
               <th>Match</th>
               <th>Reason</th>
             </tr>
@@ -70,11 +78,12 @@ function RequestAnalysis() {
           <tbody>
             {sectionData.map((item, index) => (
               <tr key={index}>
-                <td>{item.fieldName}</td>
-                <td>{typeof item.request_value === 'object' ? JSON.stringify(item.request_value) : item.request_value || 'N/A'}</td>
-                <td>{typeof item.response_value === 'object' ? JSON.stringify(item.response_value) : item.response_value || 'N/A'}</td>
-                <td>{item.match ? '✅' : '⚠️'}</td>
-                <td>{typeof item.reason === 'object' ? JSON.stringify(item.reason) : item.reason || 'N/A'}</td>
+                <td className="table-cell">{item.fieldName}</td>
+                <td className="table-cell">{typeof item.request_value === 'object' ? JSON.stringify(item.request_value) : item.request_value || 'N/A'}</td>
+                <td className="table-cell">{typeof item.response_value === 'object' ? JSON.stringify(item.response_value) : item.response_value || 'N/A'}</td>
+                <td className="table-cell">{item.important ? 'Yes' : 'No'}</td>
+                <td className="table-cell">{renderMatchSymbol(item)}</td>
+                <td className="table-cell">{typeof item.reason === 'object' ? JSON.stringify(item.reason) : item.reason || 'N/A'}</td>
               </tr>
             ))}
           </tbody>
